@@ -92,4 +92,50 @@ def create_modules(blocks):
             upsample = nn.Upsample(scale_factor=2, mode="bilinear")
             module.add_module("upsample_{0}".format(index), upsample)
 
+        # If it is a route layer
+        elif x["type"] == "route":
+            x["layers"] = x["layers"].split(",")
+            # Start of a route
+            start = int(x["layers"][0])
+            # End, if there exits one
+            try:
+                end = int(x["layers"][1])
+            except:
+                end = 0
+            # Positive anotation
+            if start > 0:
+                start = start - index
+            if end > 0:
+                end = end - index
+            route = EmptyLayer()
+            module.add_module("route_{0}".format(index), route)
+            if end < 0:
+                filters = output_filters[index + start] + output_filters[index + end]
+            else:
+                filters = output_filters[index + start]
             
+        # Shortcut corresponds to skip connection
+        elif x["type"] == "shortcut":
+            shortcut = EmptyLayer()
+            module.add_module("shortcut_{0}".format(index), shortcut)
+
+
+        # Yolo is the detection layer
+        elif x["type"] == "yolo":
+            mask = x["mask"].split(",")
+            mask = [int(x) for x in mask]
+
+            anchors = x["anchors"].split(",")
+            anchors = [int(x) for x in anchors]
+            anchors = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors), 2)]
+            anchors = [anchors[i] for i in mask]
+
+            detection = DetectionLayer(anchors)
+            module.add_module("Detection_{}".format(index), detection)
+
+        module_list.append(module)
+        prev_filters = filters
+        output_filters.append(filters)
+
+    return (net_info, module_list)
+    
